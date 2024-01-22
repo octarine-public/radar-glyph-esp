@@ -1,1 +1,24 @@
-{}
+{
+	"Glyph": "Глиф",
+	"Radar": "Радар",
+	"Creeps": "Крипы",
+	"Forts": "Форты",
+	"Towers": "Башни",
+	"Barracks": "Бараки",
+	"State": "Состояние",
+	"Additional size": "Доп. размер",
+	"Radar cooldown": "Кулдаун радара",
+	"Glyph cooldown": "Кулдаун глифа",
+	"Radar and glyph": "Радар и глиф",
+	"Reset settings": "Сбросить настройки",
+	"Show enemy glyph cooldown": "Показывать кулдаун вражеского глифа",
+	"Show enemy radar cooldown": "Показывать кулдаун вражеского радара",
+	"Reset settings to default": "Сбросить настройки по умолчанию",
+	"Show glyph on forts": "Показывать глиф на фортах",
+	"Show glyph on towers": "Показывать глиф на башнях",
+	"Show glyph on creeps": "Показывать глиф на крипах",
+	"Show glyph on barracks": "Показывать глиф на бараках",
+	"Show glyph timer in world": "Показывать таймер глифа в мире",
+	"Show radar timer in world": "Показывать таймер радара в мире",
+	"Scanning territory...": "Сканирование территории..."
+}
