@@ -98,7 +98,12 @@ export class RadarManager {
 		for (let index = this.modifiers.length - 1; index > -1; index--) {
 			const modifier = this.modifiers[index]
 			const keyName = this.GetKeyName(modifier)
-			this.UpdateRadius(keyName, modifier.Parent)
+			this.UpdateRadius(
+				keyName,
+				modifier.Parent,
+				modifier.Caster,
+				modifier.Duration
+			)
 		}
 	}
 
