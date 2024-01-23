@@ -136,21 +136,12 @@ export class GUI {
 		const time = team !== Team.Radiant ? radiantTime : direTime,
 			charge = team !== Team.Radiant ? radiantCharges : direCharges
 
-		const remaining = this.GetRatio(time, maxCooldown),
-			color = remaining > 0 ? Color.Red.SetA(200) : Color.Green.SetA(200)
-
-		RendererSDK.Arc(
-			-90,
-			remaining > 0 ? remaining : 100,
-			position.pos1,
-			position.Size,
-			false,
-			GUIInfo.ScaleWidth(6),
-			color
-		)
+		const remaining = this.GetRatio(time, maxCooldown)
 
 		if (remaining !== 0) {
-			this.Text(MathSDK.FormatTime(time), position, 3, 500)
+			const remPos = position.Clone()
+			remPos.AddX(position.Width)
+			this.Text(MathSDK.FormatTime(time), remPos, 3, 500)
 		}
 
 		if (!charge) {
