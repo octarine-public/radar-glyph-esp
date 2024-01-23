@@ -1,6 +1,5 @@
 import {
 	Color,
-	Fort,
 	Fountain,
 	GameState,
 	MinimapSDK,
@@ -15,8 +14,8 @@ import { GUI } from "../gui"
 import { MenuManager } from "../menu/index"
 
 export class RadarManager {
-	private readonly fountain: Fort[] = []
 	private readonly pSDK = new ParticlesSDK()
+	private readonly fountain: Fountain[] = []
 	private readonly modifiers: Modifier[] = []
 	private readonly modifierName = "modifier_radar_thinker"
 
