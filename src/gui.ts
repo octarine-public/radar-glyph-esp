@@ -140,7 +140,11 @@ export class GUI {
 
 		if (remaining !== 0) {
 			const remPos = position.Clone()
-			remPos.AddX(position.Width)
+			if (GUIInfo.HUDFlipped) {
+				remPos.SubtractX(position.Width)
+			} else {
+				remPos.AddX(position.Width)
+			}
 			this.Text(MathSDK.FormatTime(time), remPos, 3, 500)
 		}
 
