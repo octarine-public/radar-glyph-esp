@@ -107,11 +107,15 @@ export class RadarManager {
 	}
 
 	protected GetKeyName(modifier: Modifier) {
-		const caster = modifier.Caster
+		const caster = modifier.Caster,
+			thinker = modifier.Parent
 		if (caster === undefined) {
 			console.error("caster is undefined", new Error().stack)
 		}
-		return modifier.Name + "_" + caster?.Index ?? modifier.Index
+		if (thinker === undefined) {
+			console.error("thinker is undefined", new Error().stack)
+		}
+		return `${modifier.Name}_${thinker?.Index ?? modifier.Index}_${caster?.Index ?? -1}`
 	}
 
 	protected UpdateRadius(
