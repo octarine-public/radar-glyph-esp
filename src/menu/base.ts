@@ -13,7 +13,7 @@ export abstract class BaseWorldMenu {
 	) {
 		this.Tree = node.AddNode(
 			nameNode,
-			icon ?? ImageData.Paths.Icons.icon_svg_hamburger,
+			icon ?? ImageData.Icons.icon_svg_hamburger,
 			tooltip,
 			iconRound
 		)

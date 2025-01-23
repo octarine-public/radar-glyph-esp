@@ -72,12 +72,7 @@ export class GUI {
 			return
 		}
 
-		RendererSDK.Image(
-			ImageData.Paths.Icons.icon_scan_on,
-			position.pos1,
-			-1,
-			position.Size
-		)
+		RendererSDK.Image(ImageData.Icons.icon_scan_on, position.pos1, -1, position.Size)
 
 		const iconPosition = position.Clone(),
 			iconName = ImageData.GetHeroTexture(casterName, true)
