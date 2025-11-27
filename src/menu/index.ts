@@ -13,7 +13,7 @@ export class MenuManager {
 	public readonly GCooldown: Menu.Toggle
 
 	private readonly tree: Menu.Node
-	private readonly baseNode = Menu.AddEntry("Visual")
+	private readonly baseNode = Menu.AddEntryDeep(["Visual", "Maphack"])
 
 	constructor() {
 		const iconGlyph = ImageData.Icons.icon_glyph_on
