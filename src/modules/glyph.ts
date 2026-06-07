@@ -1,4 +1,4 @@
-import { Barrack, Fort, Modifier, Unit } from "github.com/octarine-public/wrapper/index"
+import { Barrack, Fort, Modifier, npc_dota_unit_roshans_banner, Unit } from "github.com/octarine-public/wrapper/index"
 
 import { GUI } from "../gui"
 import { MenuManager } from "../menu/index"
@@ -17,8 +17,8 @@ export class GlyphManager {
 		if (!menu.Glyph.State.value) {
 			return
 		}
-		for (let index = this.modifiers.length - 1; index > -1; index--) {
-			const modifier = this.modifiers[index],
+		for (let i = this.modifiers.length - 1; i > -1; i--) {
+			const modifier = this.modifiers[i],
 				owner = modifier.Parent
 			if (owner === undefined || !this.stateByMenu(owner)) {
 				continue
@@ -30,19 +30,16 @@ export class GlyphManager {
 			)
 		}
 	}
-
 	public ModifierCreated(modifier: Modifier) {
-		if (modifier.Name === this.modifierName) {
+		if (this.isValidModifier(modifier)) {
 			this.modifiers.push(modifier)
 		}
 	}
-
 	public ModifierRemoved(modifier: Modifier) {
-		if (modifier.Name === this.modifierName) {
+		if (this.isValidModifier(modifier)) {
 			this.modifiers.remove(modifier)
 		}
 	}
-
 	private stateByMenu(owner: Unit) {
 		switch (true) {
 			case owner.IsCreep:
@@ -56,5 +53,14 @@ export class GlyphManager {
 			default:
 				return false
 		}
+	}
+	private isValidModifier(modifier: Modifier) {
+		if (modifier.Name !== this.modifierName) {
+			return false
+		}
+		if (modifier.AuraOwner instanceof npc_dota_unit_roshans_banner) {
+			return false
+		}
+		return true
 	}
 }
