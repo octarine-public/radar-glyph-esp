@@ -11,6 +11,7 @@ import {
 	GameRules,
 	GameState,
 	Modifier,
+	RendererSDK,
 	Thinker,
 	Unit
 } from "github.com/octarine-public/wrapper/index"
@@ -28,11 +29,12 @@ new (class CScanGlyph {
 	private readonly glyphManager = new GlyphManager(this.menu)
 
 	constructor() {
-		EventsSDK.on("Draw", this.Draw.bind(this))
+		EventsSDK.on("Draw2D", this.Draw.bind(this))
 		EventsSDK.on("EntityCreated", this.EntityCreated.bind(this))
 		EventsSDK.on("EntityDestroyed", this.EntityDestroyed.bind(this))
 		EventsSDK.on("ModifierCreated", this.ModifierCreated.bind(this))
 		EventsSDK.on("ModifierRemoved", this.ModifierRemoved.bind(this))
+		this.menu.MenuChanged(() => RendererSDK.InvalidateDraw2D())
 	}
 
 	protected get State() {

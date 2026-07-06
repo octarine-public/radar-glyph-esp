@@ -5,6 +5,7 @@ import {
 	MinimapSDK,
 	Modifier,
 	ParticlesSDK,
+	RendererSDK,
 	Team,
 	Unit
 } from "github.com/octarine-public/wrapper/index"
@@ -50,7 +51,7 @@ export class RadarManager {
 			}
 			gui.DrawRadarWorld(
 				caster.Name,
-				owner.Position,
+				owner,
 				modifier.RemainingTime,
 				menu.Radar.Size.value
 			)
@@ -85,12 +86,14 @@ export class RadarManager {
 			modifier.Caster,
 			modifier.Duration
 		)
+		RendererSDK.InvalidateDraw2D()
 	}
 
 	protected Destroy(modifier: Modifier) {
 		this.modifiers.remove(modifier)
 		MinimapSDK.DeleteIcon(this.GetKeyName(modifier))
 		this.pSDK.DestroyByKey(this.GetKeyName(modifier))
+		RendererSDK.InvalidateDraw2D()
 	}
 
 	protected Restart() {

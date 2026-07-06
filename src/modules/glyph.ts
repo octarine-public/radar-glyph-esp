@@ -1,4 +1,11 @@
-import { Barrack, Fort, Modifier, npc_dota_unit_roshans_banner, Unit } from "github.com/octarine-public/wrapper/index"
+import {
+	Barrack,
+	Fort,
+	Modifier,
+	npc_dota_unit_roshans_banner,
+	RendererSDK,
+	Unit
+} from "github.com/octarine-public/wrapper/index"
 
 import { GUI } from "../gui"
 import { MenuManager } from "../menu/index"
@@ -23,21 +30,19 @@ export class GlyphManager {
 			if (owner === undefined || !this.stateByMenu(owner)) {
 				continue
 			}
-			gui.DrawGlyphWorld(
-				owner.Position,
-				modifier.RemainingTime,
-				menu.Glyph.Size.value
-			)
+			gui.DrawGlyphWorld(owner, modifier.RemainingTime, menu.Glyph.Size.value)
 		}
 	}
 	public ModifierCreated(modifier: Modifier) {
 		if (this.isValidModifier(modifier)) {
 			this.modifiers.push(modifier)
+			RendererSDK.InvalidateDraw2D()
 		}
 	}
 	public ModifierRemoved(modifier: Modifier) {
 		if (this.isValidModifier(modifier)) {
 			this.modifiers.remove(modifier)
+			RendererSDK.InvalidateDraw2D()
 		}
 	}
 	private stateByMenu(owner: Unit) {

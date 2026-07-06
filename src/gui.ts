@@ -1,4 +1,5 @@
 import {
+	AnchorKind,
 	Color,
 	GameRules,
 	GUIInfo,
@@ -10,6 +11,8 @@ import {
 	RendererSDK,
 	Team,
 	TextFlags,
+	Unit,
+	Vector2,
 	Vector3
 } from "github.com/octarine-public/wrapper/index"
 
@@ -54,51 +57,84 @@ export class GUI {
 		)
 	}
 
-	public DrawGlyphWorld(origin: Vector3, time: number, menuSize: number) {
-		const position = this.GetW2SPosition(origin, menuSize)
-		if (position !== undefined) {
-			this.Text(time, position)
+	public DrawGlyphWorld(owner: Unit, time: number, menuSize: number) {
+		const position = this.GetLocalRect(owner.Position, menuSize)
+		if (position === undefined) {
+			return
 		}
+		RendererSDK.DrawEntityRelative(
+			owner.Index,
+			AnchorKind.Origin,
+			this.worldGetPos(owner),
+			() => this.Text(time, position)
+		)
 	}
 
 	public DrawRadarWorld(
 		casterName: string,
-		origin: Vector3,
+		owner: Unit,
 		time: number,
 		menuSize: number
 	) {
-		const position = this.GetW2SPosition(origin, menuSize + 10)
+		const position = this.GetLocalRect(owner.Position, menuSize + 10)
 		if (position === undefined) {
 			return
 		}
+		RendererSDK.DrawEntityRelative(
+			owner.Index,
+			AnchorKind.Origin,
+			this.worldGetPos(owner),
+			() => {
+				RendererSDK.Image(
+					ImageData.Icons.icon_scan_on,
+					position.pos1,
+					-1,
+					position.Size
+				)
 
-		RendererSDK.Image(ImageData.Icons.icon_scan_on, position.pos1, -1, position.Size)
+				const iconPosition = position.Clone(),
+					iconName = ImageData.GetHeroTexture(casterName, true)
+				iconPosition.Width /= 2
+				iconPosition.Height /= 2
+				iconPosition.AddX(iconPosition.Width / 2)
+				iconPosition.SubtractY(iconPosition.Height / 2)
+				RendererSDK.Image(iconName, iconPosition.pos1, -1, iconPosition.Size)
 
-		const iconPosition = position.Clone(),
-			iconName = ImageData.GetHeroTexture(casterName, true)
-		iconPosition.Width /= 2
-		iconPosition.Height /= 2
-		iconPosition.AddX(iconPosition.Width / 2)
-		iconPosition.SubtractY(iconPosition.Height / 2)
-		RendererSDK.Image(iconName, iconPosition.pos1, -1, iconPosition.Size)
+				// remening time
+				this.Text(time, position, 3)
 
-		// remening time
-		this.Text(time, position, 3)
-
-		const infoPosition = position.Clone()
-		infoPosition.AddY(position.Height)
-		this.Text(Menu.Localization.Localize("Scanning territory..."), infoPosition, 3.75)
+				const infoPosition = position.Clone()
+				infoPosition.AddY(position.Height)
+				this.Text(
+					Menu.Localization.Localize("Scanning territory..."),
+					infoPosition,
+					3.75
+				)
+			}
+		)
 	}
 
-	protected GetW2SPosition(origin: Vector3, menuSize: number) {
+	protected worldGetPos(owner: Unit) {
+		return (): Nullable<Vector2> => {
+			if (!owner.IsValid) {
+				return undefined
+			}
+			const w2s = RendererSDK.WorldToScreen(owner.Position)
+			if (w2s === undefined || GUIInfo.Contains(w2s)) {
+				return undefined
+			}
+			return w2s
+		}
+	}
+
+	protected GetLocalRect(origin: Vector3, menuSize: number) {
 		const w2s = RendererSDK.WorldToScreen(origin)
 		if (w2s === undefined || GUIInfo.Contains(w2s)) {
 			return undefined
 		}
 		const mSize = Math.max(menuSize + 10, 10)
 		const scaleSize = GUIInfo.ScaleVector(mSize, mSize)
-		const position = new Rectangle(w2s.Subtract(scaleSize), w2s.Add(scaleSize))
-		return position
+		return new Rectangle(scaleSize.MultiplyScalar(-1), scaleSize)
 	}
 
 	protected Text(
