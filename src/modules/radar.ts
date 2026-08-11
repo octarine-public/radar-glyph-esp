@@ -1,13 +1,3 @@
-import {
-	Color,
-	Fountain,
-	GameState,
-	MinimapSDK,
-	Modifier,
-	ParticlesSDK,
-	Team,
-	Unit
-} from "github.com/octarine-public/wrapper/index"
 
 import { ETeamState } from "../enum"
 import { GUI } from "../gui"

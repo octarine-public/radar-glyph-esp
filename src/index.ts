@@ -1,20 +1,5 @@
 import "./translations"
 
-import {
-	Building,
-	DOTAGameState,
-	DOTAGameUIState,
-	Entity,
-	EventsSDK,
-	Fort,
-	Fountain,
-	GameRules,
-	GameState,
-	Modifier,
-	Thinker,
-	Unit
-} from "github.com/octarine-public/wrapper/index"
-
 import { GUI } from "./gui"
 import { MenuManager } from "./menu/index"
 import { GlyphManager } from "./modules/glyph"
@@ -45,8 +30,8 @@ new (class CScanGlyph {
 
 	protected get IsPostGame() {
 		return (
-			GameRules === undefined ||
-			GameRules.GameState === DOTAGameState.DOTA_GAMERULES_STATE_POST_GAME
+			Dota2SDK.GameRules === undefined ||
+			Dota2SDK.GameRules.GameState === DOTAGameState.DOTA_GAMERULES_STATE_POST_GAME
 		)
 	}
 

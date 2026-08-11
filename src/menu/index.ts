@@ -1,4 +1,3 @@
-import { ImageData, Menu } from "github.com/octarine-public/wrapper/index"
 
 import { GlyphWorldMenu } from "./glyph"
 import { RadarWorldMenu } from "./radar"

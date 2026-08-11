@@ -1,29 +1,15 @@
-import {
-	Color,
-	GameRules,
-	GUIInfo,
-	ImageData,
-	LocalPlayer,
-	MathSDK,
-	Menu,
-	Rectangle,
-	RendererSDK,
-	Team,
-	TextFlags,
-	Vector3
-} from "github.com/octarine-public/wrapper/index"
 
 export class GUI {
 	public DrawRadarOnScreen() {
-		const localHero = LocalPlayer?.Hero
-		if (GameRules === undefined || localHero === undefined) {
+		const localHero = Dota2SDK.LocalPlayer?.Hero
+		if (Dota2SDK.GameRules === undefined || localHero === undefined) {
 			return
 		}
 		const maxCooldown = 210,
-			direCooldown = GameRules.ScanCooldownDire,
-			radiantCooldown = GameRules.ScanCooldownRadiant,
-			direCharges = GameRules.ScanChargesDire,
-			radiantCharges = GameRules.ScanChargesDire
+			direCooldown = Dota2SDK.GameRules.ScanCooldownDire,
+			radiantCooldown = Dota2SDK.GameRules.ScanCooldownRadiant,
+			direCharges = Dota2SDK.GameRules.ScanChargesDire,
+			radiantCharges = Dota2SDK.GameRules.ScanChargesDire
 
 		this.DrawCooldownOnScreen(
 			GUIInfo.Minimap.Scan,
@@ -37,13 +23,13 @@ export class GUI {
 	}
 
 	public DrawGlyphOnScreen() {
-		const localHero = LocalPlayer?.Hero
-		if (GameRules === undefined || localHero === undefined) {
+		const localHero = Dota2SDK.LocalPlayer?.Hero
+		if (Dota2SDK.GameRules === undefined || localHero === undefined) {
 			return
 		}
 		const maxCooldown = 300,
-			direCooldown = GameRules.GlyphCooldownDire,
-			radiantCooldown = GameRules.GlyphCooldownRadiant
+			direCooldown = Dota2SDK.GameRules.GlyphCooldownDire,
+			radiantCooldown = Dota2SDK.GameRules.GlyphCooldownRadiant
 
 		this.DrawCooldownOnScreen(
 			GUIInfo.Minimap.Glyph,
@@ -140,7 +126,7 @@ export class GUI {
 			} else {
 				remPos.AddX(position.Width)
 			}
-			this.Text(MathSDK.FormatTime(time), remPos, 3, 500)
+			this.Text(Math.formatTime(time), remPos, 3, 500)
 		}
 
 		if (!charge) {
