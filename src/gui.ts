@@ -1,43 +1,75 @@
 
 export class GUI {
+	private scanCooldown: Nullable<HTMLElement>
+	private scanCharges: Nullable<HTMLElement>
+	private glyphCooldown: Nullable<HTMLElement>
+
+	private readonly attachScanCooldown = (element: Nullable<HTMLElement | null>) => {
+		this.scanCooldown = element ?? undefined
+	}
+
+	private readonly attachScanCharges = (element: Nullable<HTMLElement | null>) => {
+		this.scanCharges = element ?? undefined
+	}
+
+	private readonly attachGlyphCooldown = (element: Nullable<HTMLElement | null>) => {
+		this.glyphCooldown = element ?? undefined
+	}
+
+	constructor() {
+		MenuSDK.RegisterPanel(
+			"scan-glyph-cooldowns",
+			() => this.RenderCooldowns(),
+			MenuSDK.EPanelLayer.Screen
+		)
+	}
+
 	public DrawRadarOnScreen() {
-		const localHero = Dota2SDK.LocalPlayer?.Hero
-		if (Dota2SDK.GameRules === undefined || localHero === undefined) {
+		const rules = Dota2SDK.GameRules,
+			team = Dota2SDK.LocalPlayer?.Hero?.Team
+		if (rules === undefined || team === undefined || !GameState.CanDrawOverlays) {
+			this.HideRadarOnScreen()
 			return
 		}
-		const maxCooldown = 210,
-			direCooldown = Dota2SDK.GameRules.ScanCooldownDire,
-			radiantCooldown = Dota2SDK.GameRules.ScanCooldownRadiant,
-			direCharges = Dota2SDK.GameRules.ScanChargesDire,
-			radiantCharges = Dota2SDK.GameRules.ScanChargesDire
-
-		this.DrawCooldownOnScreen(
+		const isRadiant = team === Team.Radiant
+		this.WriteCooldown(
+			this.scanCooldown,
 			GUIInfo.Minimap.Scan,
-			localHero.Team,
-			direCooldown,
-			radiantCooldown,
-			maxCooldown,
-			direCharges,
-			radiantCharges
+			isRadiant ? rules.ScanCooldownDire : rules.ScanCooldownRadiant
+		)
+		this.WriteCharges(
+			this.scanCharges,
+			GUIInfo.Minimap.Scan,
+			isRadiant ? rules.ScanChargesDire : rules.ScanChargesRadiant
 		)
 	}
 
 	public DrawGlyphOnScreen() {
-		const localHero = Dota2SDK.LocalPlayer?.Hero
-		if (Dota2SDK.GameRules === undefined || localHero === undefined) {
+		const rules = Dota2SDK.GameRules,
+			team = Dota2SDK.LocalPlayer?.Hero?.Team
+		if (rules === undefined || team === undefined || !GameState.CanDrawOverlays) {
+			this.HideGlyphOnScreen()
 			return
 		}
-		const maxCooldown = 300,
-			direCooldown = Dota2SDK.GameRules.GlyphCooldownDire,
-			radiantCooldown = Dota2SDK.GameRules.GlyphCooldownRadiant
-
-		this.DrawCooldownOnScreen(
+		this.WriteCooldown(
+			this.glyphCooldown,
 			GUIInfo.Minimap.Glyph,
-			localHero.Team,
-			direCooldown,
-			radiantCooldown,
-			maxCooldown
+			team === Team.Radiant ? rules.GlyphCooldownDire : rules.GlyphCooldownRadiant
 		)
+	}
+
+	public HideOnScreen() {
+		this.HideRadarOnScreen()
+		this.HideGlyphOnScreen()
+	}
+
+	public HideRadarOnScreen() {
+		this.HideLabel(this.scanCooldown)
+		this.HideLabel(this.scanCharges)
+	}
+
+	public HideGlyphOnScreen() {
+		this.HideLabel(this.glyphCooldown)
 	}
 
 	public DrawGlyphWorld(origin: Vector3, time: number, menuSize: number) {
@@ -100,43 +132,86 @@ export class GUI {
 		RendererSDK.TextByFlags(text, position, Color.White, division, flags, width)
 	}
 
-	protected DrawCooldownOnScreen(
-		pos: Rectangle,
-		team: Team,
-		direTime: number,
-		radiantTime: number,
-		maxCooldown: number,
-		direCharges: number = 0,
-		radiantCharges: number = 0
+	protected WriteCooldown(
+		element: Nullable<HTMLElement>,
+		rect: Rectangle,
+		time: number
 	) {
-		const position = pos.Clone()
-
-		position.pos1.AddScalarForThis(5 / 2)
-		position.pos2.SubtractScalarForThis(3)
-
-		const time = team !== Team.Radiant ? radiantTime : direTime,
-			charge = team !== Team.Radiant ? radiantCharges : direCharges
-
-		const remaining = this.GetRatio(time, maxCooldown)
-
-		if (remaining !== 0) {
-			const remPos = position.Clone()
-			if (GUIInfo.HUDFlipped) {
-				remPos.SubtractX(position.Width)
-			} else {
-				remPos.AddX(position.Width)
-			}
-			this.Text(Math.formatTime(time), remPos, 3, 500)
-		}
-
-		if (!charge) {
+		if (element === undefined) {
 			return
 		}
-
-		this.Text(charge.toFixed(), position, 3, 500, TextFlags.Top | TextFlags.Left)
+		if (time <= 0) {
+			MenuSDK.WriteShown(element, false)
+			return
+		}
+		const width = rect.Width - 5.5,
+			height = rect.Height - 5.5,
+			left = rect.x + 2.5 + (GUIInfo.HUDFlipped ? -width : width)
+		MenuSDK.WritePx(element, "left", Math.round(left))
+		MenuSDK.WritePx(element, "top", Math.round(rect.y + 2.5))
+		MenuSDK.WritePx(element, "width", Math.round(width))
+		MenuSDK.WritePx(element, "line-height", Math.round(height))
+		MenuSDK.WritePx(element, "font-size", Math.round(height / 3 + 4))
+		if (MenuSDK.MarkValue(element, "m:time", Math.ceil(time))) {
+			MenuSDK.WriteText(element, Math.formatTime(time))
+		}
+		MenuSDK.WriteShown(element, true, "block")
 	}
 
-	protected GetRatio(time: number, maxTime: number) {
-		return Math.max(100 * (time / maxTime), 0)
+	protected WriteCharges(
+		element: Nullable<HTMLElement>,
+		rect: Rectangle,
+		charges: number
+	) {
+		if (element === undefined) {
+			return
+		}
+		if (!charges) {
+			MenuSDK.WriteShown(element, false)
+			return
+		}
+		MenuSDK.WritePx(element, "left", Math.round(rect.x + 2.5))
+		MenuSDK.WritePx(element, "top", Math.round(rect.y + 2.5))
+		MenuSDK.WritePx(element, "font-size", Math.round((rect.Height - 5.5) / 3 + 4))
+		if (MenuSDK.MarkValue(element, "m:charges", charges)) {
+			MenuSDK.WriteText(element, charges.toFixed())
+		}
+		MenuSDK.WriteShown(element, true, "block")
+	}
+
+	protected HideLabel(element: Nullable<HTMLElement>) {
+		if (element !== undefined) {
+			MenuSDK.WriteShown(element, false)
+		}
+	}
+
+	private RenderCooldowns(): React.ReactNode {
+		return React.createElement(
+			React.Fragment,
+			null,
+			this.HudLabel(this.attachScanCooldown, "center"),
+			this.HudLabel(this.attachScanCharges, "left"),
+			this.HudLabel(this.attachGlyphCooldown, "center")
+		)
+	}
+
+	private HudLabel(
+		ref: React.RefCallback<HTMLElement>,
+		textAlign: "center" | "left"
+	): React.ReactElement {
+		return React.createElement("div", {
+			ref,
+			style: {
+				position: "absolute",
+				display: "block",
+				visibility: "hidden",
+				color: MenuSDK.Tokens.TextBright,
+				fontWeight: 500,
+				fontEffect: "outline(1px #000000)",
+				textAlign,
+				whiteSpace: "nowrap",
+				pointerEvents: "none"
+			}
+		})
 	}
 }

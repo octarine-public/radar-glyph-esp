@@ -39,6 +39,8 @@ new (class CScanGlyph {
 		if (this.State && this.IsUIGame && !this.IsPostGame) {
 			this.radarManager.Draw(this.gui)
 			this.glyphManager.Draw(this.gui)
+		} else {
+			this.gui.HideOnScreen()
 		}
 	}
 

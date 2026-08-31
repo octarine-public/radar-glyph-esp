@@ -12,6 +12,8 @@ export class GlyphManager {
 		const menu = this.menu
 		if (menu.GCooldown.value) {
 			gui.DrawGlyphOnScreen()
+		} else {
+			gui.HideGlyphOnScreen()
 		}
 		if (!menu.Glyph.State.value) {
 			return

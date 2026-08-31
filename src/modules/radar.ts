@@ -23,6 +23,8 @@ export class RadarManager {
 		const menu = this.menu
 		if (menu.RCooldown.value) {
 			gui.DrawRadarOnScreen()
+		} else {
+			gui.HideRadarOnScreen()
 		}
 		if (!menu.Radar.State.value) {
 			return
