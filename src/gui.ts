@@ -1,3 +1,4 @@
+import { canvas } from "../render"
 
 export class GUI {
 	private scanCooldown: Nullable<HTMLElement>
@@ -90,7 +91,7 @@ export class GUI {
 			return
 		}
 
-		RendererSDK.Image(ImageData.Icons.icon_scan_on, position.pos1, -1, position.Size)
+		canvas.Image(ImageData.Icons.icon_scan_on, position.pos1, position.Size)
 
 		const iconPosition = position.Clone(),
 			iconName = ImageData.GetHeroTexture(casterName, true)
@@ -98,9 +99,8 @@ export class GUI {
 		iconPosition.Height /= 2
 		iconPosition.AddX(iconPosition.Width / 2)
 		iconPosition.SubtractY(iconPosition.Height / 2)
-		RendererSDK.Image(iconName, iconPosition.pos1, -1, iconPosition.Size)
+		canvas.Image(iconName, iconPosition.pos1, iconPosition.Size)
 
-		// remening time
 		this.Text(time, position, 3)
 
 		const infoPosition = position.Clone()
@@ -129,7 +129,12 @@ export class GUI {
 		if (typeof text === "number") {
 			text = text.toFixed(text < 10 ? 1 : 0)
 		}
-		RendererSDK.TextByFlags(text, position, Color.White, division, flags, width)
+		canvas.TextIn(text, position, {
+			color: Color.White,
+			size: position.Height / Math.max(division, 1.2) + 4,
+			flags,
+			weight: width
+		})
 	}
 
 	protected WriteCooldown(
