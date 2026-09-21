@@ -1,4 +1,3 @@
-
 import { ETeamState } from "../enum"
 import { GUI } from "../gui"
 import { MenuManager } from "../menu/index"
@@ -26,27 +25,31 @@ export class RadarManager {
 		} else {
 			gui.HideRadarOnScreen()
 		}
-		if (!menu.Radar.State.value) {
-			return
-		}
-		for (let index = this.modifiers.length - 1; index > -1; index--) {
-			const modifier = this.modifiers[index],
-				owner = modifier.Parent,
-				caster = modifier.Caster
-			if (
-				owner === undefined ||
-				caster === undefined ||
-				!this.stateByTeam(caster)
-			) {
-				continue
+		// a scan reports itself while it runs and dissolves once it stops. The frame is closed
+		// either way, so turning the row off takes what stands in the world down the same way a
+		// scan running out does, rather than cutting it off the map mid-count.
+		if (menu.Radar.State.value) {
+			for (let index = this.modifiers.length - 1; index > -1; index--) {
+				const modifier = this.modifiers[index],
+					owner = modifier.Parent,
+					caster = modifier.Caster
+				if (
+					owner === undefined ||
+					caster === undefined ||
+					!this.stateByTeam(caster)
+				) {
+					continue
+				}
+				gui.DrawRadarWorld(
+					this.GetKeyName(modifier),
+					caster.Name,
+					owner.Position,
+					modifier.RemainingTime,
+					menu.Radar.Size.value
+				)
 			}
-			gui.DrawRadarWorld(
-				caster.Name,
-				owner.Position,
-				modifier.RemainingTime,
-				menu.Radar.Size.value
-			)
 		}
+		gui.EndRadarWorld()
 	}
 
 	public EntityCreated(entity: Fountain) {
@@ -146,13 +149,13 @@ export class RadarManager {
 		}
 	}
 
-	protected stateByTeam(unit: Unit, eTeam = this.menu.Radar.Team.SelectedID) {
-		const isEnemy = unit.IsEnemy(),
-			stateAlly = eTeam === ETeamState.Ally,
-			stateEnemy = eTeam === ETeamState.Enemy
-		return (
-			!(stateEnemy && !isEnemy) &&
-			!(isEnemy && stateAlly && GameState.LocalTeam !== Team.Observer)
-		)
+	protected stateByTeam(unit: Unit) {
+		const team = this.menu.Radar.Team
+		// spectating, neither side is yours: every scan is someone else's, so a tick on
+		// either one stands for both rather than leaving the map with nothing on it
+		if (GameState.LocalTeam === Team.Observer) {
+			return team.SelectedIDs.length !== 0
+		}
+		return team.IsSelected(unit.IsEnemy() ? ETeamState.Enemies : ETeamState.Allies)
 	}
 }
