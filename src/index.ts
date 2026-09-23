@@ -40,10 +40,11 @@ new (class CScanGlyph {
 			this.radarManager.Draw(this.gui)
 			this.glyphManager.Draw(this.gui)
 		} else {
-			// no world to stand a scan in: what is on its way out goes now rather than
-			// dissolving onto a loading screen the next time a match opens
+			// no world to stand a scan or a chip in: what is on its way out goes now rather
+			// than dissolving onto a loading screen the next time a match opens
 			this.gui.HideOnScreen()
 			this.gui.ResetRadarWorld()
+			this.gui.ResetGlyphWorld()
 		}
 	}
 

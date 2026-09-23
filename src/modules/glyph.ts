@@ -50,14 +50,16 @@ export class GlyphManager {
 		} else {
 			gui.HideGlyphOnScreen()
 		}
-		if (!menu.Glyph.State.value) {
-			return
+		if (menu.Glyph.State.value) {
+			if (menu.Glyph.Group.value) {
+				this.DrawGroups(gui)
+			} else {
+				this.DrawEach(gui)
+			}
 		}
-		if (menu.Glyph.Group.value) {
-			this.DrawGroups(gui)
-		} else {
-			this.DrawEach(gui)
-		}
+		// what stands in the world is settled once every reading has reported, so a chip
+		// whose glyph has just run out - or that was switched off - can dissolve on its way out
+		gui.EndGlyphWorld()
 	}
 	public ModifierCreated(modifier: Modifier) {
 		if (this.isValidModifier(modifier)) {
@@ -78,7 +80,7 @@ export class GlyphManager {
 			if (owner === undefined || !this.stateByMenu(owner)) {
 				continue
 			}
-			gui.DrawGlyphWorld(owner.Position, modifier.RemainingTime, size)
+			gui.DrawGlyphWorld(owner.Index, owner.Position, modifier.RemainingTime, size)
 		}
 	}
 	/** One reading over each run of units, where that run stands. */
@@ -88,7 +90,7 @@ export class GlyphManager {
 		this.Collect(menu.Radius.value)
 		for (let i = 0; i < this.live; i++) {
 			const group = this.groups[i]
-			gui.DrawGlyphWorld(group.center, group.time, size)
+			gui.DrawGlyphWorld(-1 - i, group.center, group.time, size)
 		}
 	}
 	/**

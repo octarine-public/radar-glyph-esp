@@ -57,31 +57,49 @@ const INSET = 1
 /** How long a reading takes to fade once what it was counting is gone, in seconds. */
 const FADE = 0.25
 /**
- * The chip the glyph's reading wears in the world, in dp at the slider's own setting: the game's
- * glyph icon, the time left beside it, and under both a plate barely washed in the glyph's colour
- * and rimmed by a hairline of it. The same dress `ward-tracker` puts a ward's reading in, and for
- * the same reason — what the chip has to say is said by the icon, so the number beside it can be
- * small, and a plate this faint groups the two without standing between the wave and the eye.
+ * The chip the glyph's reading wears in the world, in dp at the slider's own setting: the card the
+ * menu's own panels wear - its glass, its hairline rim, its frost and its halo, whatever the theme
+ * set - washed in the glyph's colour, the game's glyph icon and the time left beside it. The same
+ * dress `ward-tracker` puts a ward's reading in, and for the same reason - what the chip has to say
+ * is said by the icon, so the number beside it can be small, and the card groups the two without
+ * standing between the wave and the eye. The slider scales the whole thing about {@link CHIP_BASE}.
  */
-const CHIP_HEIGHT = 20
-const CHIP_RADIUS = 6
-const CHIP_PAD = 5
-const CHIP_GAP = 4
-const CHIP_ICON = 15
-const CHIP_FONT = 12
-const CHIP_BORDER = 1
-/** How deep the plate and its rim are washed in the colour, out of 255. */
-const CHIP_TINT = 36
-const CHIP_EDGE = 107
+const CHIP_HEIGHT = 24
 /**
- * How dark the outline under the reading is cut, 0 to 1. The plate is too faint to hold a number
- * off a lit creep by itself, and the run carries the rest — enough to stand on anything it lands
- * on, short of the black rim that would make the chip a label rather than a wash.
+ * The corner, in dp: the menu's own card radius, which carries the theme's radius scale with it,
+ * held to a pill so a wide radius on a low chip never turns its corners inside out.
  */
-const CHIP_OUTLINE = 0.5
-/** The slider notch the chip is drawn 1:1 at, and how many notches away from it double its size. */
+const CHIP_RADIUS = Math.min(MenuSDK.HudCardRadius, CHIP_HEIGHT / 2)
+const CHIP_PAD = 7
+const CHIP_GAP = 6
+const CHIP_ICON = 18
+const CHIP_FONT = 12
+const CHIP_WEIGHT = MenuSDK.HudBold
+/** How deep the glass is washed in the tint over the theme's own colour, out of 255. */
+const CHIP_TINT = 36
+/** The slider notch the chip is drawn 1:1 at; every notch is a twelfth either way. */
 const CHIP_BASE = 2
 const CHIP_STEP = 12
+/** The gap two chips stacked over one point keep between them, in dp. */
+const CHIP_STACK_GAP = 3
+/**
+ * How long a chip takes to come in, and how long it takes to dissolve once what it was counting
+ * is gone. Going is the longer of the two: a glyph that ran out is worth a beat, where a chip
+ * arriving should simply be there.
+ */
+const CHIP_ENTER_MS = MenuSDK.Duration.Fade
+const CHIP_EXIT_MS = MenuSDK.Duration.Reveal
+/** How far out of focus a chip stands at the far end of its dissolve, in dp. */
+const CHIP_DISSOLVE_BLUR = 0
+/** How far up it drifts by then, in dp. */
+const CHIP_DISSOLVE_LIFT = 6
+/** How much of its size it keeps by then. */
+const CHIP_DISSOLVE_SCALE = 0.92
+/** How long a chip takes to slide most of the way into a new place in its stack, in ms. */
+const CHIP_SLIDE_MS = 80
+/** How long it takes to glide most of the way to where its group now stands. */
+const CHIP_GLIDE_MS = 80
+const CHIP_SURFACE_PREFIX = "radar-glyph-esp:glyph:"
 /**
  * The light blue the game lights its glyph button and its shield in, which is the one colour the
  * reading is already known by. `HudColors.readable` relights it for whichever theme the menu
@@ -166,16 +184,21 @@ class Readout {
 }
 
 /**
- * How much of a scan stands this frame, 0 to 1: it eases to 1 as the scan arrives and back to 0
- * once it is over, and everything the group is drawn in is inked at that much of full strength.
- * Turning around midway carries on from where the value stood, so a scan cast again on a spot one
- * just left picks up where that one had got to rather than blinking.
+ * How much of a scan or a chip stands this frame, 0 to 1: it eases to 1 as the thing arrives and
+ * back to 0 once it is over, and everything the group is drawn in is read off it. Turning around
+ * midway carries on from where the value stood, so a scan cast again on a spot one just left, or
+ * a glyph re-cast on a wave, picks up where that one had got to rather than blinking.
  */
 class Presence {
 	private value = 0
 	private from = 0
 	private target = 0
 	private since = -1
+
+	constructor(
+		private readonly enterMs: number,
+		private readonly exitMs: number
+	) {}
 
 	public To(target: number, now: number) {
 		if (target === this.target) {
@@ -191,7 +214,7 @@ class Presence {
 			return this.value
 		}
 		const rising = this.target > this.from,
-			span = (rising ? SCAN_ENTER_MS : SCAN_EXIT_MS) / MenuSDK.AnimationSpeed(),
+			span = (rising ? this.enterMs : this.exitMs) / MenuSDK.AnimationSpeed(),
 			at = Math.min((now - this.since) / span, 1)
 		this.value =
 			at >= 1
@@ -207,12 +230,90 @@ class Presence {
 }
 
 /**
+ * One glyph chip. It outlives the group it was drawn from, which is what it takes to dissolve
+ * after the glyph is gone, and it draws on a surface of its own so the card the theme dresses it
+ * in reaches this chip alone rather than every chip on the map.
+ */
+class ChipView {
+	/** Where the chip stands in the world, gliding towards {@link ChipView.target}. */
+	public readonly position = new Vector3()
+	/** Where the group was last reported to stand. */
+	public readonly target = new Vector3()
+	public placed = false
+	public readonly life = new Presence(CHIP_ENTER_MS, CHIP_EXIT_MS)
+	/**
+	 * The surface the chip draws on: the card the menu's own panels wear, which
+	 * {@link MenuSDK.HudCard.Frame} only draws onto an active surface.
+	 */
+	public readonly surface: MenuSDK.CHudSurface
+	public time = 0
+	public size = 0
+	/** Whether the group this was drawn from still had a glyph this frame. */
+	public seen = false
+	/** How far below the point over the group the chip stands, in px, eased into place. */
+	public slide = 0
+	public settled = false
+
+	constructor(public readonly Key: number) {
+		this.surface = MenuSDK.HudSurfaceOf(
+			CHIP_SURFACE_PREFIX + Key,
+			MenuSDK.EPanelLayer.World
+		)
+	}
+	public Drop() {
+		MenuSDK.DropHudSurface(CHIP_SURFACE_PREFIX + this.Key)
+	}
+}
+
+/**
+ * Where this frame's chips already stand, so a group standing on top of another does not draw
+ * its chip over the first one's: a chip that would overlap one placed before it climbs until it
+ * stands clear, and the pair reads as a stack over the point instead of one chip hiding the other.
+ */
+class ChipLayout {
+	private readonly placed: Rectangle[] = []
+	private count = 0
+
+	public Begin() {
+		this.count = 0
+	}
+	/** The top edge a chip at `x`,`y` can take without covering one already placed. */
+	public Settle(x: number, y: number, width: number, height: number, gap: number) {
+		const right = x + width
+		let top = y,
+			moved = true
+		while (moved) {
+			moved = false
+			for (let i = 0; i < this.count; i++) {
+				const other = this.placed[i]
+				if (
+					right <= other.pos1.x ||
+					x >= other.pos2.x ||
+					top + height <= other.pos1.y ||
+					top >= other.pos2.y
+				) {
+					continue
+				}
+				top = other.pos1.y - gap - height
+				moved = true
+			}
+		}
+		const slot =
+			this.placed[this.count] ?? (this.placed[this.count] = new Rectangle())
+		slot.pos1.SetVector(x, top)
+		slot.pos2.SetVector(right, top + height)
+		this.count++
+		return top
+	}
+}
+
+/**
  * One scan standing in the world. It outlives the modifier it was drawn from — that is what it
  * takes to fade out after the scan is over — so it holds everything the last frame it was live
  * reported: where it stood, how long it had left, who cast it, and how big the slider wanted it.
  */
 class ScanView {
-	public readonly life = new Presence()
+	public readonly life = new Presence(SCAN_ENTER_MS, SCAN_EXIT_MS)
 	public readonly position = new Vector3()
 
 	public casterName = ""
@@ -250,40 +351,19 @@ export class GUI {
 		weight: SCAN_TEXT_WEIGHT
 	}
 
-	/**
-	 * What a chip is drawn out of, struck once and refilled every time one is: a chip over every
-	 * group of every frame would otherwise mint a colour and a vector apiece for nothing.
-	 */
-	private readonly chipFill = new Color()
-	private readonly chipEdge = new Color()
-	private readonly chipInk = new Color()
+	/** Every chip in the world: the ones a group still reports, and the ones on their way out. */
+	private readonly chips: ChipView[] = []
+	private readonly chipLayout = new ChipLayout()
+	private readonly chipBox = new Rectangle()
 	private readonly chipPos = new Vector2()
 	private readonly chipSize = new Vector2()
-	private readonly chipBox = new Rectangle()
-	private readonly chipPlate: {
-		color: Color
-		borderColor: Color
-		borderWidth: number
-		radius: number
-	} = {
-		color: this.chipFill,
-		borderColor: this.chipEdge,
-		borderWidth: CHIP_BORDER,
-		radius: CHIP_RADIUS
-	}
-	private readonly chipText: {
-		color: Color
-		size: number
-		weight: number
-		effect: MenuSDK.EHudTextEffect
-		effectOpacity: number
-	} = {
-		color: this.chipInk,
-		size: CHIP_FONT,
-		weight: MenuSDK.HudBold,
-		effect: MenuSDK.EHudTextEffect.Outline,
-		effectOpacity: CHIP_OUTLINE
-	}
+	private chipLastFrame = -1
+	/**
+	 * How many cards this frame has carved so far, over every chip. Cards carved by one and the
+	 * same shader string share a decorator instance in RmlUi, so each one has to be handed a step
+	 * of its own; the step is invisible.
+	 */
+	private carved = 0
 
 	constructor() {
 		MenuSDK.RegisterPanel(
@@ -342,50 +422,188 @@ export class GUI {
 	}
 
 	/**
-	 * The glyph's reading on the world, over one unit or over the middle of a run of them: the
-	 * game's own glyph icon and the time left, laid out side by side on the chip they share.
+	 * A glyph reporting itself for this frame: the unit or the run of units `key` stands for - a
+	 * unit's entity index, or a group's slot counted down from -1 - where it stands and how long it
+	 * has left. Nothing is painted here - what stands in the world is
+	 * settled once every reading has reported, in {@link GUI.EndGlyphWorld}, so a chip whose glyph
+	 * has just run out can still be drawn on its way out.
 	 */
-	public DrawGlyphWorld(origin: Vector3, time: number, menuSize: number) {
-		const w2s = RendererSDK.WorldToScreen(origin)
+	public DrawGlyphWorld(key: number, origin: Vector3, time: number, menuSize: number) {
+		const view = this.ChipOf(key)
+		view.target.CopyFrom(origin)
+		if (!view.placed) {
+			view.position.CopyFrom(origin)
+			view.placed = true
+		}
+		view.time = time
+		view.size = menuSize
+		view.seen = true
+	}
+
+	/** Draws every chip, the reported ones arriving or standing and the rest dissolving. */
+	public EndGlyphWorld() {
+		const now = hrtime(),
+			dt = this.chipLastFrame < 0 ? 0 : now - this.chipLastFrame
+		this.chipLastFrame = now
+		this.chipLayout.Begin()
+		this.carved = 0
+		for (let index = 0; index < this.chips.length; index++) {
+			const view = this.chips[index]
+			view.life.To(view.seen ? 1 : 0, now)
+			const presence = view.life.Tick(now)
+			if (!view.seen && presence <= 0) {
+				view.Drop()
+				this.chips.splice(index--, 1)
+				continue
+			}
+			view.seen = false
+			this.DrawChip(view, presence, dt)
+		}
+	}
+
+	/** Takes every chip down at once, for a state that has no world to stand one in. */
+	public ResetGlyphWorld() {
+		for (let index = this.chips.length - 1; index > -1; index--) {
+			this.chips[index].Drop()
+		}
+		this.chips.length = 0
+		this.chipLastFrame = -1
+	}
+
+	/**
+	 * One chip in the world at `presence` of its full strength: the game's glyph icon and the time
+	 * left, side by side on the card they share, over the point the group stands on. It glides after
+	 * a group that moved, climbs clear of a chip already standing where it lands, and on its way out
+	 * thins, lifts and shrinks inside the slot it kept in the stack.
+	 */
+	private DrawChip(view: ChipView, presence: number, dt: number) {
+		if (!view.position.Equals(view.target)) {
+			view.position.LerpForThis(view.target, Math.min(dt / CHIP_GLIDE_MS, 1))
+		}
+		const w2s = RendererSDK.WorldToScreen(view.position)
 		if (w2s === undefined || GUIInfo.Contains(w2s)) {
 			return
 		}
-		// every notch of the slider is a twelfth of the chip either way, about its own setting
-		const scale = 1 + (menuSize - CHIP_BASE) / CHIP_STEP,
-			height = Math.round(GUIInfo.ScaleHeight(CHIP_HEIGHT * scale)),
-			icon = Math.round(GUIInfo.ScaleHeight(CHIP_ICON * scale)),
-			pad = GUIInfo.ScaleHeight(CHIP_PAD * scale),
-			gap = GUIInfo.ScaleHeight(CHIP_GAP * scale)
-		this.chipText.size = GUIInfo.ScaleHeight(CHIP_FONT * scale)
-		this.chipPlate.radius = GUIInfo.ScaleHeight(CHIP_RADIUS * scale)
-		this.chipPlate.borderWidth = GUIInfo.ScaleHeight(CHIP_BORDER)
+		const gone = 1 - presence,
+			k = (view.size + CHIP_STEP) / (CHIP_BASE + CHIP_STEP),
+			// the chip keeps its full-size slot in the stack while it shrinks inside it
+			ks = k * (CHIP_DISSOLVE_SCALE + (1 - CHIP_DISSOLVE_SCALE) * presence),
+			text = view.time.toFixed(view.time < 10 ? 1 : 0),
+			// digits are measured as zeroes so a ticking reading does not make the chip breathe
+			metric = text.replace(CHIP_DIGIT, "0")
 
-		const text = time.toFixed(time < 10 ? 1 : 0),
-			run = Math.round(
-				MenuSDK.TextSize(text.replace(CHIP_DIGIT, "0"), this.chipText).x
+		// the slot is laid out at the world scale, so the menu's own scale does not resize it
+		MenuSDK.setHudWorldScale(k)
+		const height = MenuSDK.hudH(CHIP_HEIGHT),
+			slotW = Math.round(
+				MenuSDK.hudW(CHIP_PAD + CHIP_GAP + CHIP_PAD) +
+					MenuSDK.hudH(CHIP_ICON) +
+					MenuSDK.HudText.Width(metric, CHIP_FONT, CHIP_WEIGHT)
 			),
-			width = Math.round(pad + icon + gap + run + pad),
-			left = Math.round(w2s.x - width / 2),
-			top = Math.round(w2s.y - height / 2)
+			slotX = Math.round(w2s.x - slotW / 2),
+			anchorY = Math.round(w2s.y - height / 2),
+			slotY = this.chipLayout.Settle(
+				slotX,
+				anchorY,
+				slotW,
+				height,
+				MenuSDK.hudH(CHIP_STACK_GAP)
+			),
+			lift = MenuSDK.hudH(CHIP_DISSOLVE_LIFT) * gone,
+			blur = MenuSDK.hudH(CHIP_DISSOLVE_BLUR) * gone
 
-		const tint = MenuSDK.HudColors.readable(CHIP_COLOR)
-		this.chipFill.CopyFrom(tint).SetA(CHIP_TINT)
-		this.chipEdge.CopyFrom(tint).SetA(CHIP_EDGE)
-		this.chipInk.CopyFrom(tint)
+		// a chip finding a new place in its stack slides there rather than jumping
+		const offset = slotY - anchorY
+		if (!view.settled) {
+			view.slide = offset
+			view.settled = true
+		} else {
+			view.slide += (offset - view.slide) * Math.min(dt / CHIP_SLIDE_MS, 1)
+		}
 
-		this.chipPos.SetVector(left, top)
-		this.chipSize.SetVector(width, height)
-		canvas.Rect(this.chipPos, this.chipSize, this.chipPlate)
+		// the chip itself is laid out at the size it stands at this frame, inside that slot
+		MenuSDK.setHudWorldScale(ks)
+		const pad = MenuSDK.hudW(CHIP_PAD),
+			gap = MenuSDK.hudW(CHIP_GAP),
+			icon = MenuSDK.hudH(CHIP_ICON),
+			textW = MenuSDK.HudText.Width(metric, CHIP_FONT, CHIP_WEIGHT),
+			width = Math.round(pad + icon + gap + textW + pad),
+			chipH = MenuSDK.hudH(CHIP_HEIGHT),
+			x = Math.round(w2s.x - width / 2),
+			y = Math.round(anchorY + view.slide + (height - chipH) / 2 - lift),
+			centerY = y + chipH / 2,
+			alpha = Math.round(255 * presence)
 
-		const cursor = Math.round(left + pad)
-		this.chipPos.SetVector(cursor, Math.round(top + (height - icon) / 2))
-		this.chipSize.SetVector(icon, icon)
-		canvas.Image(ImageData.Icons.icon_glyph_on, this.chipPos, this.chipSize)
+		view.surface.Blur(blur)
+		MenuSDK.SetActiveSurface(view.surface)
+		try {
+			const tint = MenuSDK.HudColors.readable(CHIP_COLOR)
+			// the card's own alpha fades everything drawn on the glass after it with the chip
+			this.ChipPlate(x, y, width, chipH, tint, alpha)
 
-		const runLeft = Math.round(cursor + icon + gap)
-		this.chipBox.pos1.SetVector(runLeft, top)
-		this.chipBox.pos2.SetVector(runLeft + run, top + height)
-		canvas.TextIn(text, this.chipBox, this.chipText)
+			let cursor = x + pad
+			this.chipPos.SetVector(cursor, Math.round(centerY - icon / 2))
+			this.chipSize.SetVector(icon, icon)
+			// the game's own icon as it is, gold and all: the wash under it carries the colour
+			MenuSDK.HudCard.Image(
+				ImageData.Icons.icon_glyph_on,
+				this.chipPos,
+				this.chipSize,
+				Color.WhiteReadonly,
+				MenuSDK.hudAlpha()
+			)
+			cursor += icon + gap
+
+			MenuSDK.HudText.Center(
+				cursor,
+				centerY,
+				textW,
+				text,
+				CHIP_FONT,
+				MenuSDK.HudColors.body,
+				CHIP_WEIGHT
+			)
+		} finally {
+			MenuSDK.SetActiveSurface(undefined)
+		}
+	}
+
+	/**
+	 * The plate under the chip: the menu's own card, so the glass, the rim, the blur and the halo
+	 * are whatever the theme dresses its panels in, with the glyph's colour washed over the glass.
+	 */
+	private ChipPlate(
+		x: number,
+		y: number,
+		w: number,
+		h: number,
+		tint: Color,
+		alpha: number
+	) {
+		this.chipBox.pos1.SetVector(x, y)
+		this.chipBox.pos2.SetVector(x + w, y + h)
+		MenuSDK.HudCard.Frame(this.chipBox, alpha, CHIP_RADIUS, this.carved++)
+		MenuSDK.HudCard.Plate(
+			x,
+			y,
+			w,
+			h,
+			MenuSDK.hudRadius(CHIP_RADIUS),
+			tint,
+			MenuSDK.hudAlpha(CHIP_TINT)
+		)
+	}
+
+	/** The chip `key` stands on, opened the first frame it reports. */
+	private ChipOf(key: number) {
+		for (const known of this.chips) {
+			if (known.Key === key) {
+				return known
+			}
+		}
+		const view = new ChipView(key)
+		this.chips.push(view)
+		return view
 	}
 
 	/**
