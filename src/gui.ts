@@ -721,10 +721,10 @@ export class GUI {
 	 * the strip's own dark backing runs on for another 24 and carries most of the run. The game's
 	 * cover takes the middle of the button, so the two readings never stand on each other.
 	 */
-	protected WriteCooldown(readout: Readout, rect: Rectangle, time: number) {
+	protected WriteCooldown(readout: Readout, rect: Nullable<Rectangle>, time: number) {
 		const element = readout.element,
 			alpha = readout.Step(time > 0)
-		if (element === undefined || alpha <= 0) {
+		if (element === undefined || alpha <= 0 || rect === undefined) {
 			if (element !== undefined) {
 				MenuSDK.WriteShown(element, false)
 			}
@@ -752,10 +752,10 @@ export class GUI {
 	}
 
 	/** The enemy's scan charges, in the corner of the button the game leaves its own badge out of. */
-	protected WriteCharges(readout: Readout, rect: Rectangle, charges: number) {
+	protected WriteCharges(readout: Readout, rect: Nullable<Rectangle>, charges: number) {
 		const element = readout.element,
 			alpha = readout.Step(charges > 0)
-		if (element === undefined || alpha <= 0) {
+		if (element === undefined || alpha <= 0 || rect === undefined) {
 			if (element !== undefined) {
 				MenuSDK.WriteShown(element, false)
 			}
