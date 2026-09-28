@@ -108,12 +108,6 @@ const CHIP_SURFACE_PREFIX = "radar-glyph-esp:glyph:"
  */
 const CHIP_COLOR = new Color(91, 199, 255)
 /**
- * The chip is measured off a stand-in of the same shape rather than off the reading itself: the
- * face's digits are not one width, so a chip measured off `1.4` steps in and out again as the tick
- * turns it into `1.3`, under a group that has not moved. A zero is the widest of the ten.
- */
-const CHIP_DIGIT = /\d/g
-/**
  * What the count over a scan is set in, taken from the portal timer `teleport-esp` hangs over a
  * teleport rather than invented again here: the canvas's circular timer writes its reading at 0.35
  * of the icon it stands on and cuts it at 700, and a scan standing in the same world at the same
@@ -230,6 +224,10 @@ class Presence {
 	}
 }
 
+function ChipTextWidth(text: string) {
+	return MenuSDK.HudText.Width(text, CHIP_FONT, CHIP_WEIGHT)
+}
+
 /**
  * One glyph chip. It outlives the group it was drawn from, which is what it takes to dissolve
  * after the glyph is gone, and it draws on a surface of its own so the card the theme dresses it
@@ -249,13 +247,7 @@ class ChipView {
 	public readonly surface: MenuSDK.CHudSurface
 	public time = 0
 	public size = 0
-	/**
-	 * The reading the chip draws, and the same with every digit a zero, which is what its width is
-	 * measured by. They move on once the host has measured the new reading: until then the chip
-	 * keeps the last one it could size, rather than standing a frame without its reading.
-	 */
-	public text = ""
-	public metric = ""
+	public readonly reading = new MenuSDK.HeldText(ChipTextWidth)
 	/** Whether the group this was drawn from still had a glyph this frame. */
 	public seen = false
 	/** How far below the point over the group the chip stands, in px, eased into place. */
@@ -327,13 +319,6 @@ class ScanView {
 	public casterName = ""
 	public time = 0
 	public size = 0
-	/**
-	 * The reading the chip draws, and the same with every digit a zero, which is what its width is
-	 * measured by. They move on once the host has measured the new reading: until then the chip
-	 * keeps the last one it could size, rather than standing a frame without its reading.
-	 */
-	public text = ""
-	public metric = ""
 	/** Whether the scan this was drawn from was still running this frame. */
 	public seen = false
 
@@ -501,25 +486,13 @@ export class GUI {
 		}
 		const gone = 1 - presence,
 			k = (view.size + CHIP_STEP) / (CHIP_BASE + CHIP_STEP),
-			reading = view.time.toFixed(view.time < 10 ? 1 : 0),
-			// digits are measured as zeroes so a ticking reading does not make the chip breathe
-			readingMetric = reading.replace(CHIP_DIGIT, "0")
+			reading = view.reading
 
-		// laid out at the world scale, so the menu's own scale does not resize it
 		MenuSDK.setHudWorldScale(k)
-		// a reading the host has not measured yet comes back 0 wide; drawn like that the plate
-		// would stand without its time for a frame and then widen once the measurement lands
-		let textW = MenuSDK.HudText.Width(readingMetric, CHIP_FONT, CHIP_WEIGHT)
-		if (textW !== 0) {
-			view.text = reading
-			view.metric = readingMetric
-		} else if (view.metric.length !== 0) {
-			textW = MenuSDK.HudText.Width(view.metric, CHIP_FONT, CHIP_WEIGHT)
-		}
-		if (textW === 0) {
+		if (!reading.Take(view.time.toFixed(view.time < 10 ? 1 : 0))) {
 			return
 		}
-		const text = view.text,
+		const textW = reading.Width,
 			pad = MenuSDK.hudW(CHIP_PAD),
 			gap = MenuSDK.hudW(CHIP_GAP),
 			icon = MenuSDK.hudH(CHIP_ICON),
@@ -574,7 +547,7 @@ export class GUI {
 				cursor,
 				centerY,
 				textW,
-				text,
+				reading.Text,
 				CHIP_FONT,
 				MenuSDK.HudColors.body,
 				CHIP_WEIGHT
