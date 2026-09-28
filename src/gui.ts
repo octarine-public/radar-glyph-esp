@@ -84,17 +84,18 @@ const CHIP_STEP = 12
 const CHIP_STACK_GAP = 3
 /**
  * How long a chip takes to come in, and how long it takes to dissolve once what it was counting
- * is gone. Going is the longer of the two: a glyph that ran out is worth a beat, where a chip
- * arriving should simply be there.
+ * is gone: both brisk, and the plate and its reading fade and drift as one.
  */
-const CHIP_ENTER_MS = MenuSDK.Duration.Fade
-const CHIP_EXIT_MS = MenuSDK.Duration.Reveal
+const CHIP_ENTER_MS = 100
+const CHIP_EXIT_MS = 100
 /** How far out of focus a chip stands at the far end of its dissolve, in dp. */
 const CHIP_DISSOLVE_BLUR = 0
-/** How far up it drifts by then, in dp. */
+/**
+ * How far up it drifts by then, in dp. The chip only fades and drifts, never scales: its width
+ * comes from the host's measurement of the reading at that exact font size, and a size that
+ * changes every frame is never measured in time, so the plate would lose its text mid-dissolve.
+ */
 const CHIP_DISSOLVE_LIFT = 6
-/** How much of its size it keeps by then. */
-const CHIP_DISSOLVE_SCALE = 0.92
 /** How long a chip takes to slide most of the way into a new place in its stack, in ms. */
 const CHIP_SLIDE_MS = 80
 /** How long it takes to glide most of the way to where its group now stands. */
@@ -248,6 +249,13 @@ class ChipView {
 	public readonly surface: MenuSDK.CHudSurface
 	public time = 0
 	public size = 0
+	/**
+	 * The reading the chip draws, and the same with every digit a zero, which is what its width is
+	 * measured by. They move on once the host has measured the new reading: until then the chip
+	 * keeps the last one it could size, rather than standing a frame without its reading.
+	 */
+	public text = ""
+	public metric = ""
 	/** Whether the group this was drawn from still had a glyph this frame. */
 	public seen = false
 	/** How far below the point over the group the chip stands, in px, eased into place. */
@@ -319,6 +327,13 @@ class ScanView {
 	public casterName = ""
 	public time = 0
 	public size = 0
+	/**
+	 * The reading the chip draws, and the same with every digit a zero, which is what its width is
+	 * measured by. They move on once the host has measured the new reading: until then the chip
+	 * keeps the last one it could size, rather than standing a frame without its reading.
+	 */
+	public text = ""
+	public metric = ""
 	/** Whether the scan this was drawn from was still running this frame. */
 	public seen = false
 
@@ -474,7 +489,7 @@ export class GUI {
 	 * One chip in the world at `presence` of its full strength: the game's glyph icon and the time
 	 * left, side by side on the card they share, over the point the group stands on. It glides after
 	 * a group that moved, climbs clear of a chip already standing where it lands, and on its way out
-	 * thins, lifts and shrinks inside the slot it kept in the stack.
+	 * thins and lifts, its reading with it.
 	 */
 	private DrawChip(view: ChipView, presence: number, dt: number) {
 		if (!view.position.Equals(view.target)) {
@@ -486,26 +501,36 @@ export class GUI {
 		}
 		const gone = 1 - presence,
 			k = (view.size + CHIP_STEP) / (CHIP_BASE + CHIP_STEP),
-			// the chip keeps its full-size slot in the stack while it shrinks inside it
-			ks = k * (CHIP_DISSOLVE_SCALE + (1 - CHIP_DISSOLVE_SCALE) * presence),
-			text = view.time.toFixed(view.time < 10 ? 1 : 0),
+			reading = view.time.toFixed(view.time < 10 ? 1 : 0),
 			// digits are measured as zeroes so a ticking reading does not make the chip breathe
-			metric = text.replace(CHIP_DIGIT, "0")
+			readingMetric = reading.replace(CHIP_DIGIT, "0")
 
-		// the slot is laid out at the world scale, so the menu's own scale does not resize it
+		// laid out at the world scale, so the menu's own scale does not resize it
 		MenuSDK.setHudWorldScale(k)
-		const height = MenuSDK.hudH(CHIP_HEIGHT),
-			slotW = Math.round(
-				MenuSDK.hudW(CHIP_PAD + CHIP_GAP + CHIP_PAD) +
-					MenuSDK.hudH(CHIP_ICON) +
-					MenuSDK.HudText.Width(metric, CHIP_FONT, CHIP_WEIGHT)
-			),
-			slotX = Math.round(w2s.x - slotW / 2),
+		// a reading the host has not measured yet comes back 0 wide; drawn like that the plate
+		// would stand without its time for a frame and then widen once the measurement lands
+		let textW = MenuSDK.HudText.Width(readingMetric, CHIP_FONT, CHIP_WEIGHT)
+		if (textW !== 0) {
+			view.text = reading
+			view.metric = readingMetric
+		} else if (view.metric.length !== 0) {
+			textW = MenuSDK.HudText.Width(view.metric, CHIP_FONT, CHIP_WEIGHT)
+		}
+		if (textW === 0) {
+			return
+		}
+		const text = view.text,
+			pad = MenuSDK.hudW(CHIP_PAD),
+			gap = MenuSDK.hudW(CHIP_GAP),
+			icon = MenuSDK.hudH(CHIP_ICON),
+			width = Math.round(pad + icon + gap + textW + pad),
+			height = MenuSDK.hudH(CHIP_HEIGHT),
+			x = Math.round(w2s.x - width / 2),
 			anchorY = Math.round(w2s.y - height / 2),
 			slotY = this.chipLayout.Settle(
-				slotX,
+				x,
 				anchorY,
-				slotW,
+				width,
 				height,
 				MenuSDK.hudH(CHIP_STACK_GAP)
 			),
@@ -521,17 +546,8 @@ export class GUI {
 			view.slide += (offset - view.slide) * Math.min(dt / CHIP_SLIDE_MS, 1)
 		}
 
-		// the chip itself is laid out at the size it stands at this frame, inside that slot
-		MenuSDK.setHudWorldScale(ks)
-		const pad = MenuSDK.hudW(CHIP_PAD),
-			gap = MenuSDK.hudW(CHIP_GAP),
-			icon = MenuSDK.hudH(CHIP_ICON),
-			textW = MenuSDK.HudText.Width(metric, CHIP_FONT, CHIP_WEIGHT),
-			width = Math.round(pad + icon + gap + textW + pad),
-			chipH = MenuSDK.hudH(CHIP_HEIGHT),
-			x = Math.round(w2s.x - width / 2),
-			y = Math.round(anchorY + view.slide + (height - chipH) / 2 - lift),
-			centerY = y + chipH / 2,
+		const y = Math.round(anchorY + view.slide - lift),
+			centerY = y + height / 2,
 			alpha = Math.round(255 * presence)
 
 		view.surface.Blur(blur)
@@ -539,7 +555,7 @@ export class GUI {
 		try {
 			const tint = MenuSDK.HudColors.readable(CHIP_COLOR)
 			// the card's own alpha fades everything drawn on the glass after it with the chip
-			this.ChipPlate(x, y, width, chipH, tint, alpha)
+			this.ChipPlate(x, y, width, height, tint, alpha)
 
 			let cursor = x + pad
 			this.chipPos.SetVector(cursor, Math.round(centerY - icon / 2))
