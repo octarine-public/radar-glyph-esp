@@ -96,10 +96,6 @@ const CHIP_DISSOLVE_BLUR = 0
  * changes every frame is never measured in time, so the plate would lose its text mid-dissolve.
  */
 const CHIP_DISSOLVE_LIFT = 6
-/** How long a chip takes to slide most of the way into a new place in its stack, in ms. */
-const CHIP_SLIDE_MS = 80
-/** How long it takes to glide most of the way to where its group now stands. */
-const CHIP_GLIDE_MS = 80
 const CHIP_SURFACE_PREFIX = "radar-glyph-esp:glyph:"
 /**
  * The light blue the game lights its glyph button and its shield in, which is the one colour the
@@ -234,11 +230,8 @@ function ChipTextWidth(text: string) {
  * in reaches this chip alone rather than every chip on the map.
  */
 class ChipView {
-	/** Where the chip stands in the world, gliding towards {@link ChipView.target}. */
-	public readonly position = new Vector3()
 	/** Where the group was last reported to stand. */
-	public readonly target = new Vector3()
-	public placed = false
+	public readonly position = new Vector3()
 	public readonly life = new Presence(CHIP_ENTER_MS, CHIP_EXIT_MS)
 	/**
 	 * The surface the chip draws on: the card the menu's own panels wear, which
@@ -250,9 +243,6 @@ class ChipView {
 	public readonly reading = new MenuSDK.HeldText(ChipTextWidth)
 	/** Whether the group this was drawn from still had a glyph this frame. */
 	public seen = false
-	/** How far below the point over the group the chip stands, in px, eased into place. */
-	public slide = 0
-	public settled = false
 
 	constructor(public readonly Key: number) {
 		this.surface = MenuSDK.HudSurfaceOf(
@@ -357,7 +347,6 @@ export class GUI {
 	private readonly chipBox = new Rectangle()
 	private readonly chipPos = new Vector2()
 	private readonly chipSize = new Vector2()
-	private chipLastFrame = -1
 	/**
 	 * How many cards this frame has carved so far, over every chip. Cards carved by one and the
 	 * same shader string share a decorator instance in RmlUi, so each one has to be handed a step
@@ -430,11 +419,7 @@ export class GUI {
 	 */
 	public DrawGlyphWorld(key: number, origin: Vector3, time: number, menuSize: number) {
 		const view = this.ChipOf(key)
-		view.target.CopyFrom(origin)
-		if (!view.placed) {
-			view.position.CopyFrom(origin)
-			view.placed = true
-		}
+		view.position.CopyFrom(origin)
 		view.time = time
 		view.size = menuSize
 		view.seen = true
@@ -442,9 +427,7 @@ export class GUI {
 
 	/** Draws every chip, the reported ones arriving or standing and the rest dissolving. */
 	public EndGlyphWorld() {
-		const now = hrtime(),
-			dt = this.chipLastFrame < 0 ? 0 : now - this.chipLastFrame
-		this.chipLastFrame = now
+		const now = hrtime()
 		this.chipLayout.Begin()
 		this.carved = 0
 		for (let index = 0; index < this.chips.length; index++) {
@@ -457,7 +440,7 @@ export class GUI {
 				continue
 			}
 			view.seen = false
-			this.DrawChip(view, presence, dt)
+			this.DrawChip(view, presence)
 		}
 	}
 
@@ -467,19 +450,15 @@ export class GUI {
 			this.chips[index].Drop()
 		}
 		this.chips.length = 0
-		this.chipLastFrame = -1
 	}
 
 	/**
 	 * One chip in the world at `presence` of its full strength: the game's glyph icon and the time
-	 * left, side by side on the card they share, over the point the group stands on. It glides after
-	 * a group that moved, climbs clear of a chip already standing where it lands, and on its way out
-	 * thins and lifts, its reading with it.
+	 * left, side by side on the card they share, over the point the group stands on. It stands
+	 * exactly where its group is reported, climbs clear of a chip already standing where it lands,
+	 * and on its way out thins and lifts, its reading with it.
 	 */
-	private DrawChip(view: ChipView, presence: number, dt: number) {
-		if (!view.position.Equals(view.target)) {
-			view.position.LerpForThis(view.target, Math.min(dt / CHIP_GLIDE_MS, 1))
-		}
+	private DrawChip(view: ChipView, presence: number) {
 		const w2s = RendererSDK.WorldToScreen(view.position)
 		if (w2s === undefined || GUIInfo.Contains(w2s)) {
 			return
@@ -508,18 +487,8 @@ export class GUI {
 				MenuSDK.hudH(CHIP_STACK_GAP)
 			),
 			lift = MenuSDK.hudH(CHIP_DISSOLVE_LIFT) * gone,
-			blur = MenuSDK.hudH(CHIP_DISSOLVE_BLUR) * gone
-
-		// a chip finding a new place in its stack slides there rather than jumping
-		const offset = slotY - anchorY
-		if (!view.settled) {
-			view.slide = offset
-			view.settled = true
-		} else {
-			view.slide += (offset - view.slide) * Math.min(dt / CHIP_SLIDE_MS, 1)
-		}
-
-		const y = Math.round(anchorY + view.slide - lift),
+			blur = MenuSDK.hudH(CHIP_DISSOLVE_BLUR) * gone,
+			y = Math.round(slotY - lift),
 			centerY = y + height / 2,
 			alpha = Math.round(255 * presence)
 
