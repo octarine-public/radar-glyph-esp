@@ -2,10 +2,9 @@ import { GUI } from "../gui"
 import { MenuManager } from "../menu/index"
 
 /**
- * A run of units close enough together to read as one thing — a wave walking a lane, the knot a
- * push makes around a tower — held as a running mean of where its members stand rather than as a
- * list of them: what one reading needs of a group is a point and a number, and both fold in as a
- * unit joins.
+ * A run of creeps close enough together to read as one thing — a wave walking a lane — held as a
+ * running mean of where its members stand rather than as a list of them: what one reading needs
+ * of a group is a point and a number, and both fold in as a unit joins.
  */
 class GlyphGroup {
 	/** The longest reading folded in: a group keeps its glyph until its last member loses it. */
@@ -83,25 +82,20 @@ export class GlyphManager {
 			gui.DrawGlyphWorld(owner.Index, owner.Position, modifier.RemainingTime, size)
 		}
 	}
-	/** One reading over each run of units, where that run stands. */
+	/**
+	 * One reading over each run of creeps, where that run stands, and one over every building on
+	 * the building itself: a building never folds into the wave pushing it.
+	 *
+	 * Creeps are sorted into groups in one pass: a creep joins the first group whose centre it
+	 * stands within the radius of, and opens one of its own where none does. Which group a creep
+	 * between two of them lands in follows the order of the walk, and that order only changes as
+	 * units gain and lose the glyph — so a wave sorts the same way for as long as it is one, and
+	 * the plate over it does not jump from frame to frame.
+	 */
 	protected DrawGroups(gui: GUI) {
 		const menu = this.menu.Glyph,
-			size = menu.Size.value
-		this.Collect(menu.Radius.value)
-		for (let i = 0; i < this.live; i++) {
-			const group = this.groups[i]
-			gui.DrawGlyphWorld(-1 - i, group.center, group.time, size)
-		}
-	}
-	/**
-	 * Sorts what is still under the glyph into groups in one pass: a unit joins the first group
-	 * whose centre it stands within `radius` of, and opens one of its own where none does. Which
-	 * group a unit between two of them lands in follows the order of the walk, and that order only
-	 * changes as units gain and lose the glyph — so a wave sorts the same way for as long as it is
-	 * one, and the plate over it does not jump from frame to frame.
-	 */
-	protected Collect(radius: number) {
-		const radiusSqr = radius * radius
+			size = menu.Size.value,
+			radiusSqr = menu.Radius.value * menu.Radius.value
 		this.live = 0
 		for (let i = this.modifiers.length - 1; i > -1; i--) {
 			const modifier = this.modifiers[i],
@@ -111,9 +105,17 @@ export class GlyphManager {
 			}
 			const position = owner.Position,
 				time = modifier.RemainingTime
+			if (!owner.IsCreep) {
+				gui.DrawGlyphWorld(owner.Index, position, time, size)
+				continue
+			}
 			if (!this.Join(position, time, radiusSqr)) {
 				this.Open(position, time)
 			}
+		}
+		for (let i = 0; i < this.live; i++) {
+			const group = this.groups[i]
+			gui.DrawGlyphWorld(-1 - i, group.center, group.time, size)
 		}
 	}
 	/** Folds a unit into the first group it stands close enough to, or says there was none. */
