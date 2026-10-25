@@ -205,8 +205,11 @@ class Presence {
 			return this.value
 		}
 		const rising = this.target > this.from,
-			span = (rising ? this.enterMs : this.exitMs) / MenuSDK.AnimationSpeed(),
-			at = Math.min((now - this.since) / span, 1)
+			span = MenuSDK.MotionSpan(
+				rising ? this.enterMs : this.exitMs,
+				MenuSDK.EThemeScope.World
+			),
+			at = MenuSDK.MotionProgress(now, this.since, span)
 		this.value =
 			at >= 1
 				? this.target
