@@ -18,13 +18,16 @@ export class RadarManager {
 		)
 	}
 
-	public Draw(gui: GUI) {
-		const menu = this.menu
-		if (menu.RCooldown.value) {
+	public DrawOnScreen(gui: GUI) {
+		if (this.menu.RCooldown.value) {
 			gui.DrawRadarOnScreen()
 		} else {
 			gui.HideRadarOnScreen()
 		}
+	}
+
+	public Draw(gui: GUI) {
+		const menu = this.menu
 		// a scan reports itself while it runs and dissolves once it stops. The frame is closed
 		// either way, so turning the row off takes what stands in the world down the same way a
 		// scan running out does, rather than cutting it off the map mid-count.

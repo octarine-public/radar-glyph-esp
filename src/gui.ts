@@ -161,6 +161,10 @@ class Readout {
 		const delta = this.last === 0 ? 0 : Math.min(Math.max(now - this.last, 0), FADE)
 		this.last = now
 		this.alpha = live ? 1 : Math.max(this.alpha - delta / FADE, 0)
+		// the readings are written at a tick's rate: a fade under way asks for every frame
+		if (this.alpha > 0 && this.alpha < 1) {
+			Source2SDK.InvalidateDraw2D()
+		}
 		return this.alpha
 	}
 

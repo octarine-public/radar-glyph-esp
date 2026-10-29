@@ -42,13 +42,16 @@ export class GlyphManager {
 
 	constructor(private readonly menu: MenuManager) {}
 
-	public Draw(gui: GUI) {
-		const menu = this.menu
-		if (menu.GCooldown.value) {
+	public DrawOnScreen(gui: GUI) {
+		if (this.menu.GCooldown.value) {
 			gui.DrawGlyphOnScreen()
 		} else {
 			gui.HideGlyphOnScreen()
 		}
+	}
+
+	public Draw(gui: GUI) {
+		const menu = this.menu
 		if (menu.Glyph.State.value) {
 			if (menu.Glyph.Group.value) {
 				this.DrawGroups(gui)

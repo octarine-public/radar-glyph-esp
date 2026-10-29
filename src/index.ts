@@ -14,6 +14,7 @@ new (class CScanGlyph {
 
 	constructor() {
 		EventsSDK.on("Draw", this.Draw.bind(this))
+		EventsSDK.on("Draw2D", this.Draw2D.bind(this))
 		EventsSDK.on("EntityCreated", this.EntityCreated.bind(this))
 		EventsSDK.on("EntityDestroyed", this.EntityDestroyed.bind(this))
 		EventsSDK.on("ModifierCreated", this.ModifierCreated.bind(this))
@@ -35,16 +36,30 @@ new (class CScanGlyph {
 		)
 	}
 
+	protected get ShouldDraw() {
+		return this.State && this.IsUIGame && !this.IsPostGame
+	}
+
+	/** The scans and the glyph chips, pinned to the world and so drawn every frame. */
 	public Draw() {
-		if (this.State && this.IsUIGame && !this.IsPostGame) {
+		if (this.ShouldDraw) {
 			this.radarManager.Draw(this.gui)
 			this.glyphManager.Draw(this.gui)
 		} else {
 			// no world to stand a scan or a chip in: what is on its way out goes now rather
 			// than dissolving onto a loading screen the next time a match opens
-			this.gui.HideOnScreen()
 			this.gui.ResetRadarWorld()
 			this.gui.ResetGlyphWorld()
+		}
+	}
+
+	/** The cooldowns by the minimap's buttons, which stand on the screen. */
+	public Draw2D() {
+		if (this.ShouldDraw) {
+			this.radarManager.DrawOnScreen(this.gui)
+			this.glyphManager.DrawOnScreen(this.gui)
+		} else {
+			this.gui.HideOnScreen()
 		}
 	}
 
