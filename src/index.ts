@@ -1,21 +1,5 @@
 import "./translations"
 
-import {
-	Building,
-	DOTAGameState,
-	DOTAGameUIState,
-	Entity,
-	EventsSDK,
-	Fort,
-	Fountain,
-	GameRules,
-	GameState,
-	Modifier,
-	RendererSDK,
-	Thinker,
-	Unit
-} from "github.com/octarine-public/wrapper/index"
-
 import { GUI } from "./gui"
 import { MenuManager } from "./menu/index"
 import { GlyphManager } from "./modules/glyph"
@@ -29,12 +13,12 @@ new (class CScanGlyph {
 	private readonly glyphManager = new GlyphManager(this.menu)
 
 	constructor() {
-		EventsSDK.on("Draw2D", this.Draw.bind(this))
+		EventsSDK.on("Draw", this.Draw.bind(this))
+		EventsSDK.on("Draw2D", this.Draw2D.bind(this))
 		EventsSDK.on("EntityCreated", this.EntityCreated.bind(this))
 		EventsSDK.on("EntityDestroyed", this.EntityDestroyed.bind(this))
 		EventsSDK.on("ModifierCreated", this.ModifierCreated.bind(this))
 		EventsSDK.on("ModifierRemoved", this.ModifierRemoved.bind(this))
-		this.menu.MenuChanged(() => RendererSDK.InvalidateDraw2D())
 	}
 
 	protected get State() {
@@ -47,15 +31,35 @@ new (class CScanGlyph {
 
 	protected get IsPostGame() {
 		return (
-			GameRules === undefined ||
-			GameRules.GameState === DOTAGameState.DOTA_GAMERULES_STATE_POST_GAME
+			Dota2SDK.GameRules === undefined ||
+			Dota2SDK.GameRules.GameState === DOTAGameState.DOTA_GAMERULES_STATE_POST_GAME
 		)
 	}
 
+	protected get ShouldDraw() {
+		return this.State && this.IsUIGame && !this.IsPostGame
+	}
+
+	/** The scans and the glyph chips, pinned to the world and so drawn every frame. */
 	public Draw() {
-		if (this.State && this.IsUIGame && !this.IsPostGame) {
+		if (this.ShouldDraw) {
 			this.radarManager.Draw(this.gui)
 			this.glyphManager.Draw(this.gui)
+		} else {
+			// no world to stand a scan or a chip in: what is on its way out goes now rather
+			// than dissolving onto a loading screen the next time a match opens
+			this.gui.ResetRadarWorld()
+			this.gui.ResetGlyphWorld()
+		}
+	}
+
+	/** The cooldowns by the minimap's buttons, which stand on the screen. */
+	public Draw2D() {
+		if (this.ShouldDraw) {
+			this.radarManager.DrawOnScreen(this.gui)
+			this.glyphManager.DrawOnScreen(this.gui)
+		} else {
+			this.gui.HideOnScreen()
 		}
 	}
 

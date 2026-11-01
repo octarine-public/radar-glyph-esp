@@ -6,6 +6,14 @@
 	"Towers": "Башни",
 	"Barracks": "Бараки",
 	"State": "Состояние",
+	"Team": "Команда",
+	"Enemies": "Враги",
+	"Allies": "Союзники",
+	"Show on team": "Показывать на команде",
+	"Group nearby": "Группировать ближних",
+	"Group radius": "Радиус группы",
+	"One reading over a run of units instead of a number on every one of them": "Одна плашка над группой юнитов вместо цифры на каждом из них",
+	"How far apart two units may stand and still read as one run": "На каком расстоянии два юнита ещё считаются одной группой",
 	"Additional size": "Доп. размер",
 	"Radar cooldown": "Кулдаун радара",
 	"Glyph cooldown": "Кулдаун глифа",
@@ -20,5 +28,6 @@
 	"Show glyph on barracks": "Показывать глиф на бараках",
 	"Show glyph timer in world": "Показывать таймер глифа в мире",
 	"Show radar timer in world": "Показывать таймер радара в мире",
+	"Radar and glyph timers in the world,\nand the enemy's cooldowns on the minimap buttons": "Таймеры радара и глифа в мире\nи кулдауны врага на кнопках миникарты",
 	"Scanning territory...": "Сканирование территории..."
 }
