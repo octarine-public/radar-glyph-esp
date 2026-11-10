@@ -91,7 +91,7 @@ export class GlyphManager {
 				owner.Position,
 				modifier.RemainingTime,
 				size,
-				owner.IsCreep && owner.IsVisible
+				owner.IsCreep ? owner : undefined
 			)
 		}
 	}
@@ -119,7 +119,7 @@ export class GlyphManager {
 			const position = owner.Position,
 				time = modifier.RemainingTime
 			if (!owner.IsCreep) {
-				gui.DrawGlyphWorld(owner.Index, position, time, size, false)
+				gui.DrawGlyphWorld(owner.Index, position, time, size)
 				continue
 			}
 			if (!this.Join(position, time, radiusSqr)) {
@@ -128,7 +128,7 @@ export class GlyphManager {
 		}
 		for (let i = 0; i < this.live; i++) {
 			const group = this.groups[i]
-			gui.DrawGlyphWorld(-1 - i, group.center, group.time, size, false)
+			gui.DrawGlyphWorld(-1 - i, group.center, group.time, size)
 		}
 	}
 	/** Folds a unit into the first group it stands close enough to, or says there was none. */

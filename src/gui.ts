@@ -250,9 +250,13 @@ class ChipView {
 	public readonly reading = new MenuSDK.HeldText(ChipTextWidth)
 	/** Whether the group this was drawn from still had a glyph this frame. */
 	public seen = false
-	/** Whether the chip follows unit `Key` as it walks, see {@link GUI.DrawGlyphWorld}. */
-	public follows = false
-	/** Where the chip stands as each frame is presented, see {@link ChipView.Pin}. */
+	/**
+	 * The origin anchor of the unit the chip follows this frame, or nothing while it stands on
+	 * {@link position}; see {@link GUI.DrawGlyphWorld}. It is the unit's own, which the SDK frees
+	 * with the unit.
+	 */
+	public followed: Nullable<CRenderAnchor>
+	/** The chip's own anchor, on the point it was last reported at; see {@link ChipView.Pin}. */
 	private readonly anchor = new CRenderAnchor()
 
 	constructor(public readonly Key: number) {
@@ -262,20 +266,23 @@ class ChipView {
 		)
 	}
 	/**
-	 * Defines the chip's anchor for this frame and answers with it: on the unit it follows, or on
-	 * the point it was last reported at - a group's middle, a building, a unit out of sight or one
-	 * whose chip is on its way out.
+	 * Answers with the anchor the chip is drawn through this frame: the origin anchor of the unit
+	 * it follows, or its own, defined here on the point it was last reported at - a group's middle,
+	 * a building, a unit out of sight or one whose chip is on its way out. The chip moves between
+	 * the two rather than redefining one: the core hides an entity anchor for the present after it
+	 * is first pointed at an entity.
 	 */
 	public Pin() {
+		const followed = this.followed
+		if (followed !== undefined) {
+			return followed
+		}
 		const anchor = this.anchor,
 			position = this.position
-		if (this.follows) {
-			anchor.SetEntity(this.Key, 0, 0, 0)
-		} else {
-			anchor.SetWorld(position.x, position.y, position.z)
-		}
+		anchor.SetWorld(position.x, position.y, position.z)
 		return anchor
 	}
+	/** Frees the chip's own anchor and its surface; the origin anchor it followed is the unit's. */
 	public Drop() {
 		this.anchor.Free()
 		MenuSDK.DropHudSurface(CHIP_SURFACE_PREFIX + this.Key)
@@ -442,22 +449,25 @@ export class GUI {
 	 * unit's entity index, or a group's slot counted down from -1 - where it stands and how long it
 	 * has left. Nothing is painted here - what stands in the world is
 	 * settled once every reading has reported, in {@link GUI.EndGlyphWorld}, so a chip whose glyph
-	 * has just run out can still be drawn on its way out. `follows` says `key` is a unit in sight
-	 * that walks, whose chip the core keeps on it as each frame is presented.
+	 * has just run out can still be drawn on its way out. `walker` is the unit `key` names where it
+	 * is one that walks: while it is in sight its chip is pinned to its origin anchor, which the core
+	 * keeps on the unit as each frame is presented. The anchor is taken out of sight as well, so the
+	 * core already reads the unit's origin by the frame the chip is first pinned to it.
 	 */
 	public DrawGlyphWorld(
 		key: number,
 		origin: Vector3,
 		time: number,
 		menuSize: number,
-		follows: boolean
+		walker?: Unit
 	) {
-		const view = this.ChipOf(key)
+		const view = this.ChipOf(key),
+			anchor = walker?.OriginRenderAnchor
 		view.position.CopyFrom(origin)
 		view.time = time
 		view.size = menuSize
 		view.seen = true
-		view.follows = follows
+		view.followed = walker?.IsVisible ? anchor : undefined
 	}
 
 	/** Draws every chip, the reported ones arriving or standing and the rest dissolving. */
@@ -475,7 +485,8 @@ export class GUI {
 				continue
 			}
 			this.DrawChip(view, presence)
-			view.seen = view.follows = false
+			view.seen = false
+			view.followed = undefined
 		}
 	}
 
@@ -492,8 +503,8 @@ export class GUI {
 	 * left, side by side on the card they share, over the point the group stands on. It stands
 	 * exactly where its group is reported, climbs clear of a chip already standing where it lands,
 	 * and on its way out thins and lifts, its reading with it. The climb is settled in screen px,
-	 * and the chip is drawn in px from the whole pixel its point lands on, through the chip's
-	 * anchor there.
+	 * and the chip is drawn in px from the whole pixel its point lands on, through the anchor
+	 * {@link ChipView.Pin} answers with.
 	 */
 	private DrawChip(view: ChipView, presence: number) {
 		const w2s = RendererSDK.WorldToScreen(view.position)
