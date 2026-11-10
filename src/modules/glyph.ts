@@ -73,7 +73,11 @@ export class GlyphManager {
 			this.modifiers.remove(modifier)
 		}
 	}
-	/** A reading over every unit that has one, which is as many of them as the wave is wide. */
+	/**
+	 * A reading over every unit that has one, which is as many of them as the wave is wide. A creep
+	 * in sight carries its reading as it walks; a building, or a creep out of sight, has it where
+	 * it stands.
+	 */
 	protected DrawEach(gui: GUI) {
 		const size = this.menu.Glyph.Size.value
 		for (let i = this.modifiers.length - 1; i > -1; i--) {
@@ -82,7 +86,13 @@ export class GlyphManager {
 			if (owner === undefined || !this.stateByMenu(owner)) {
 				continue
 			}
-			gui.DrawGlyphWorld(owner.Index, owner.Position, modifier.RemainingTime, size)
+			gui.DrawGlyphWorld(
+				owner.Index,
+				owner.Position,
+				modifier.RemainingTime,
+				size,
+				owner.IsCreep && owner.IsVisible
+			)
 		}
 	}
 	/**
@@ -109,7 +119,7 @@ export class GlyphManager {
 			const position = owner.Position,
 				time = modifier.RemainingTime
 			if (!owner.IsCreep) {
-				gui.DrawGlyphWorld(owner.Index, position, time, size)
+				gui.DrawGlyphWorld(owner.Index, position, time, size, false)
 				continue
 			}
 			if (!this.Join(position, time, radiusSqr)) {
@@ -118,7 +128,7 @@ export class GlyphManager {
 		}
 		for (let i = 0; i < this.live; i++) {
 			const group = this.groups[i]
-			gui.DrawGlyphWorld(-1 - i, group.center, group.time, size)
+			gui.DrawGlyphWorld(-1 - i, group.center, group.time, size, false)
 		}
 	}
 	/** Folds a unit into the first group it stands close enough to, or says there was none. */

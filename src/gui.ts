@@ -250,6 +250,10 @@ class ChipView {
 	public readonly reading = new MenuSDK.HeldText(ChipTextWidth)
 	/** Whether the group this was drawn from still had a glyph this frame. */
 	public seen = false
+	/** Whether the chip follows unit `Key` as it walks, see {@link GUI.DrawGlyphWorld}. */
+	public follows = false
+	/** Where the chip stands as each frame is presented, see {@link ChipView.Pin}. */
+	private readonly anchor = new CRenderAnchor()
 
 	constructor(public readonly Key: number) {
 		this.surface = MenuSDK.HudSurfaceOf(
@@ -257,7 +261,23 @@ class ChipView {
 			MenuSDK.EPanelLayer.World
 		)
 	}
+	/**
+	 * Defines the chip's anchor for this frame and answers with it: on the unit it follows, or on
+	 * the point it was last reported at - a group's middle, a building, a unit out of sight or one
+	 * whose chip is on its way out.
+	 */
+	public Pin() {
+		const anchor = this.anchor,
+			position = this.position
+		if (this.follows) {
+			anchor.SetEntity(this.Key, 0, 0, 0)
+		} else {
+			anchor.SetWorld(position.x, position.y, position.z)
+		}
+		return anchor
+	}
 	public Drop() {
+		this.anchor.Free()
 		MenuSDK.DropHudSurface(CHIP_SURFACE_PREFIX + this.Key)
 	}
 }
@@ -422,14 +442,22 @@ export class GUI {
 	 * unit's entity index, or a group's slot counted down from -1 - where it stands and how long it
 	 * has left. Nothing is painted here - what stands in the world is
 	 * settled once every reading has reported, in {@link GUI.EndGlyphWorld}, so a chip whose glyph
-	 * has just run out can still be drawn on its way out.
+	 * has just run out can still be drawn on its way out. `follows` says `key` is a unit in sight
+	 * that walks, whose chip the core keeps on it as each frame is presented.
 	 */
-	public DrawGlyphWorld(key: number, origin: Vector3, time: number, menuSize: number) {
+	public DrawGlyphWorld(
+		key: number,
+		origin: Vector3,
+		time: number,
+		menuSize: number,
+		follows: boolean
+	) {
 		const view = this.ChipOf(key)
 		view.position.CopyFrom(origin)
 		view.time = time
 		view.size = menuSize
 		view.seen = true
+		view.follows = follows
 	}
 
 	/** Draws every chip, the reported ones arriving or standing and the rest dissolving. */
@@ -446,8 +474,8 @@ export class GUI {
 				this.chips.splice(index--, 1)
 				continue
 			}
-			view.seen = false
 			this.DrawChip(view, presence)
+			view.seen = view.follows = false
 		}
 	}
 
@@ -463,7 +491,9 @@ export class GUI {
 	 * One chip in the world at `presence` of its full strength: the game's glyph icon and the time
 	 * left, side by side on the card they share, over the point the group stands on. It stands
 	 * exactly where its group is reported, climbs clear of a chip already standing where it lands,
-	 * and on its way out thins and lifts, its reading with it.
+	 * and on its way out thins and lifts, its reading with it. The climb is settled in screen px,
+	 * and the chip is drawn in px from the whole pixel its point lands on, through the chip's
+	 * anchor there.
 	 */
 	private DrawChip(view: ChipView, presence: number) {
 		const w2s = RendererSDK.WorldToScreen(view.position)
@@ -495,18 +525,20 @@ export class GUI {
 			),
 			lift = MenuSDK.hudH(CHIP_DISSOLVE_LIFT) * gone,
 			blur = MenuSDK.hudH(CHIP_DISSOLVE_BLUR) * gone,
-			y = Math.round(slotY - lift),
-			centerY = y + height / 2,
+			left = x - Math.round(w2s.x),
+			top = Math.round(slotY - lift) - Math.round(w2s.y),
+			centerY = top + height / 2,
 			alpha = Math.round(255 * presence)
 
 		view.surface.Blur(blur)
 		MenuSDK.SetActiveSurface(view.surface)
 		try {
+			view.surface.Anchor(view.Pin())
 			const tint = MenuSDK.HudColors.readable(CHIP_COLOR)
 			// the card's own alpha fades everything drawn on the glass after it with the chip
-			this.ChipPlate(x, y, width, height, tint, alpha)
+			this.ChipPlate(left, top, width, height, tint, alpha)
 
-			let cursor = x + pad
+			let cursor = left + pad
 			this.chipPos.SetVector(cursor, Math.round(centerY - icon / 2))
 			this.chipSize.SetVector(icon, icon)
 			// the game's own icon as it is, gold and all: the wash under it carries the colour
@@ -528,6 +560,7 @@ export class GUI {
 				MenuSDK.HudColors.body,
 				CHIP_WEIGHT
 			)
+			view.surface.Anchor()
 		} finally {
 			MenuSDK.SetActiveSurface(undefined)
 		}
@@ -620,22 +653,25 @@ export class GUI {
 	 * One scan in the world at `presence` of its full strength: the game's scan icon over the spot,
 	 * the portrait of whoever cast it on the icon's top edge, and the time left over the middle.
 	 * Nothing about it moves as it comes and goes — every piece of it is simply inked at `presence`,
-	 * so the group thins onto the map and back off it while standing exactly where the scan is.
+	 * so the group thins onto the map and back off it while standing exactly where the scan is. It
+	 * is drawn in px from the whole pixel the spot lands on, through a world anchor there.
 	 */
 	private DrawScan(view: ScanView, presence: number) {
-		const w2s = RendererSDK.WorldToScreen(view.position)
+		const position = view.position,
+			w2s = RendererSDK.WorldToScreen(position)
 		if (w2s === undefined || GUIInfo.Contains(w2s)) {
 			return
 		}
 		const reach = Math.max(view.size + SCAN_REACH, SCAN_REACH_MIN),
 			halfWidth = GUIInfo.ScaleWidth(reach),
 			halfHeight = GUIInfo.ScaleHeight(reach),
-			left = Math.round(w2s.x - halfWidth),
-			top = Math.round(w2s.y - halfHeight),
+			left = Math.round(w2s.x - halfWidth) - Math.round(w2s.x),
+			top = Math.round(w2s.y - halfHeight) - Math.round(w2s.y),
 			width = Math.round(halfWidth * 2),
 			height = Math.round(halfHeight * 2)
 
 		this.scanInk.SetA(Math.round(255 * presence))
+		canvas.AnchorWorld(position.x, position.y, position.z)
 
 		this.scanPos.SetVector(left, top)
 		this.scanSize.SetVector(width, height)
@@ -667,6 +703,7 @@ export class GUI {
 			this.scanBox,
 			this.scanText
 		)
+		canvas.Anchor()
 	}
 
 	/** The scan `key` stands on, opened the first frame it reports. */
