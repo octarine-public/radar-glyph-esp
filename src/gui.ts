@@ -863,7 +863,5 @@ export class GUI {
 
 /** The game's own face, or nothing where the host cannot load it and the theme's serves. */
 function loadFont(): Nullable<string> {
-	return typeof LoadFont === "function" && LoadFont(FONT_FILE, false, FONT_WEIGHT)
-		? FONT_FAMILY
-		: undefined
+	return MenuSDK.LoadFontFace(FONT_FILE, FONT_WEIGHT) ? FONT_FAMILY : undefined
 }
